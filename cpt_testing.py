@@ -159,6 +159,18 @@ santa = pygame.image.load(os.getcwd() + "\sprites\santa.png")
 santa_time = 0
 santa_hp = 500000
 
+# Sled variables 
+sled_top = pygame.image.load(os.getcwd() + "\sprites\sled_top.png")
+sled_middle = pygame.image.load(os.getcwd() + "\sprites\sled_middle.png")
+sled_bottom = pygame.image.load(os.getcwd() + "\sprites\sled_bottom.png")
+sled_moving = [False, False, False]
+sled_xy = [[200, 150], [400, 200], [100, 300]]
+sled_done = [[273, 203],[290, 210], [273, 235]]
+sled_pass = [False, False, False]
+sled_dialogue_done = False
+sled_dialogue_time = 0
+sled_dialogue_num = 0
+
 # Currency (candy cane) variables
 cane = pygame.image.load(os.getcwd() + "\sprites\Candy_cane.png")
 cane_list = [] 
@@ -696,10 +708,22 @@ while running:
                     snowman_dialogue_num += 1 
                     snowman_dialogue_time = time_run
             
-            if event.type == pygame.MOUSEBUTTONDOWN and time_run - rudolph_dialogue_time >= 150: 
+            if room == 9 and rudolph_dialogue_done == False: 
+                if event.type == pygame.MOUSEBUTTONDOWN and time_run - rudolph_dialogue_time >= 150: 
                     rudolph_dialogue_num += 1 
                     rudolph_dialogue_time = time_run
-
+            
+            if room == 11: 
+                if event.type == pygame.MOUSEBUTTONDOWN and time_run - sled_dialogue_time >= 150: 
+                    sled_dialogue_num += 1 
+                    sled_dialogue_time = time_run
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and sled_dialogue_done == True: 
+                    if player_hitbox.colliderect(pygame.Rect(sled_xy[0][0], sled_xy[0][1], 124, 15)) and sled_xy[0] != sled_done[0]: 
+                        sled_moving[0] = True 
+                    if player_hitbox.colliderect(pygame.Rect(sled_xy[1][0], sled_xy[1][1], 65, 36)) and sled_xy[1] != sled_done[1]: 
+                        sled_moving[1] = True 
+                    if player_hitbox.colliderect(pygame.Rect(sled_xy[2][0], sled_xy[2][1], 124, 15)) and sled_xy[2] != sled_done[2]: 
+                        sled_moving[2] = True 
 
         # handling keys for movement (can run multiple at a time)
         if state == 1:
@@ -949,6 +973,32 @@ while running:
             elif rudolph_hp <= 0:
                 rudolph_x = -1000000
 
+        if room == 11: 
+            for i in range(3): 
+                if sled_moving[i] == True: 
+                    sled_direction = snowball_direction(sled_done[i][0], sled_done[i][1], sled_xy[i][0], sled_xy[i][1])
+                    sled_xy[i][0] += sled_direction[0] * 5 
+                    sled_xy[i][1] += sled_direction[1] * 5
+    
+            if sled_moving[0] == True: 
+                if sled_xy[0][0] > sled_done[0][0] or sled_xy[0][1] > sled_done[0][1]: 
+                    sled_xy[0][0] = sled_done[0][0]
+                    sled_xy[0][1] = sled_done[0][1]
+                    sled_moving[0] = False 
+                    sled_pass[0] = True 
+            if sled_moving[1] == True: 
+                if sled_xy[1][0] < sled_done[1][0] or sled_xy[1][1] > sled_done[1][1]: 
+                    sled_xy[1][0] = sled_done[1][0]
+                    sled_xy[1][1] = sled_done[1][1]
+                    sled_moving[1] = False 
+                    sled_pass [1] = True 
+            if sled_moving[2] == True: 
+                if sled_xy[2][0] > sled_done[2][0] or sled_xy[2][1] < sled_done[2][1]: 
+                    sled_xy[2][0] = sled_done[2][0]
+                    sled_xy[2][1] = sled_done[2][1]
+                    sled_moving[2] = False 
+                    sled_pass[2] = True 
+
     # Settings Button in Pause Menu
     if settings_bar_rect.collidepoint(mouse_x, mouse_y) and left_M_pressed == True and state == 3 and settings == False:
         settings = True
@@ -966,8 +1016,9 @@ while running:
     if (player_hitbox.colliderect(door_rect) and 
     (room != 3 or (room == 3 and tree_hp <= 0)) and # Christmas tree room 
     (room != 2 or (room == 2 and all_elves_hp[0] <= 0)) and # Elf room 
-    (room != 9 or (room == 9 and rudolph_hp <= 0)) and # Elf room 
-    (room != 6 or (room == 6 and snowman_hp <= 0))): # Snowman room
+    (room != 9 or (room == 9 and rudolph_hp <= 0)) and # Rudolph room 
+    (room != 6 or (room == 6 and snowman_hp <= 0)) and # Snowman room 
+    (room != 11 or (room == 11 and sled_pass == [True, True, True]))): # Sled room 
         room += 1 
         player_x = WIDTH/2
         player_y = 340
@@ -1321,7 +1372,7 @@ while running:
 
 
         # Specific rooms to draw candy canes in 
-        if room in [0, 1, 2, 3, 5, 6, 7, 8, 9, 10]: 
+        if room in [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11]: 
             for candy in cane_list: 
                 screen.blit(cane, (candy[0], candy[1]))
         else: 
@@ -1609,6 +1660,21 @@ while running:
                 if rudolph_chest_opened == False:
                     screen.blit(chest_closed, (WIDTH/2-10, 200))
         
+        if room == 11: 
+            screen.blit(sled_top, sled_xy[0])
+            screen.blit(sled_middle, sled_xy[1])
+            screen.blit(sled_bottom, sled_xy[2])
+            if sled_dialogue_done == False: 
+                screen.blit(dialogue_box, (20, HEIGHT/2))
+            if sled_dialogue_num == 0:
+                draw_text("HELPPPPP!!!", text_font, (0, 0, 0), 50, 3*HEIGHT/4-20)
+            elif sled_dialogue_num == 1:
+                draw_text("I'M A BROKEN SLED!!!", text_font, (0, 0, 0), 50, 3*HEIGHT/4-20)
+            elif sled_dialogue_num == 2:
+                draw_text("Please fix me!!!", text_font, (0, 0, 0), 50, 3*HEIGHT/4-20)
+            else:
+                sled_dialogue_done = True
+
         #drawing the player's attacks (don't do damage but is visible there); function for dmg calc is only where rooms have enemies
         if event.type == pygame.MOUSEBUTTONDOWN and player_equipped == "sword":
             if w == True:
