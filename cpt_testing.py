@@ -72,7 +72,9 @@ tutorial_time_pressed = 0
 player_x = WIDTH/2
 player_y = HEIGHT/2
 moving = [0, 0, 0, 0]
-player = pygame.image.load(os.getcwd() + "\sprites\Player_Up.png")
+start_player = pygame.image.load(os.getcwd() + "\sprites\Player_Up.png")
+other_player = pygame.image.load(os.getcwd() + "\sprites\Other_player.png")
+player = start_player
 player_hitbox = pygame.Rect(player_x, player_y, 30, 25)
 player_rotated = player
 all_hits = []
@@ -117,12 +119,13 @@ chest_closed = pygame.image.load(os.getcwd() + "\sprites\chest_closed.png")
 chest_opened = pygame.image.load(os.getcwd() + "\sprites\chest_opened.png")
 
 # Snowman variables 
+snowman = pygame.image.load(os.getcwd() + "\sprites\snowman.png")
 snowman_x = 150
 snowman_y = 150
 snowman_speed = 10 
 snowman_timer = 0 
 snowballs = [] 
-snowman_hitbox = pygame.Rect(snowman_x - 25, snowman_y - 25, 50, 50) 
+snowman_hitbox = pygame.Rect(-100, -100, 50, 50) 
 snowman_hp = 200000
 snowman_damage = [] 
 player_damage = [] 
@@ -170,6 +173,8 @@ sled_pass = [False, False, False]
 sled_dialogue_done = False
 sled_dialogue_time = 0
 sled_dialogue_num = 0
+sled_chest_opened = False
+sled_rewards_collected = False 
 
 # Currency (candy cane) variables
 cane = pygame.image.load(os.getcwd() + "\sprites\Candy_cane.png")
@@ -214,11 +219,11 @@ health_potion_num = 0
 font1 = pygame.font.Font(None, 20)
 potion_text = font.render(f"{health_potion_num}", True, (0, 0, 0))
 health_cooldown = 0
-player_equipped = "sword"
+player_equipped = ""
 
 # Transition variables 
 door_rect = pygame.Rect(300, 100, 50, 10)
-room = 11
+room = 0
 
 # Bow variables
 bow_cooldown = 0
@@ -783,6 +788,14 @@ while running:
             if saving == True and event.type == pygame.KEYDOWN and event.key == pygame.K_x:
                 saving = False
                     
+        if state == 3 and settings == True: 
+            if event.type == pygame.MOUSEBUTTONDOWN: 
+                if start_player_choice.collidepoint(mouse_x, mouse_y): 
+                    player = start_player 
+                    player_rotated = player 
+                if other_player_choice.collidepoint(mouse_x, mouse_y): 
+                    player = other_player
+                    player_rotated = player
              
     font = pygame.font.Font(None, 30)
     font1 = pygame.font.Font(None, 20)
@@ -846,8 +859,9 @@ while running:
                 snowman_x += snowman_speed 
                 if snowman_x < 150 or snowman_x > 500: 
                     snowman_speed *= -1 
-                snowman_hitbox = pygame.Rect(snowman_x - 25, snowman_y - 25, 50, 50)
-
+                
+                if snowman_dialogue_done == True: 
+                    snowman_hitbox = pygame.Rect(snowman_x - 25, snowman_y - 25, 50, 50)
 
                  # When player collides with snowman
                 if player_hitbox.colliderect(snowman_hitbox): 
@@ -1472,10 +1486,6 @@ while running:
                         rudolph_hp -= 1000
                         draw_text("1000", text_font_small, (0, 0, 0), rudolph_x, rudolph_y)
 
-        # Starting room 
-        if room == 0: 
-            draw_text("Starting room", text_font, (0, 0, 0), 100, 100)
-
         # Store room 
         if room in [1, 5, 7, 10]:
              screen.blit(store, store_hitbox_rect)
@@ -1567,7 +1577,7 @@ while running:
 
         if room == 6:
             if snowman_hp > 0: 
-                pygame.draw.circle(screen, (225, 225, 225), (snowman_x, snowman_y), 30)
+                screen.blit(snowman, (snowman_x - 30, snowman_y - 30))
                 if snowman_dialogue_done == True: 
                     for snowball in snowballs: 
                         pygame.draw.circle(screen, (225, 225, 225), (snowball[0], snowball[1]), 15)
@@ -1674,6 +1684,21 @@ while running:
                 draw_text("Please fix me!!!", text_font, (0, 0, 0), 50, 3*HEIGHT/4-20)
             else:
                 sled_dialogue_done = True
+            if sled_pass == [True, True, True]: 
+                chest_rect = pygame.Rect(WIDTH/2-20, 190, 60, 50)
+                
+                if (player_hitbox.colliderect(chest_rect) or snowman_chest_opened == True) and snowman_rewards_collected == False:  
+                    time_since_collected = time_run 
+                    snowman_chest_opened = True 
+                    snowman_rewards_collected = True 
+                    candies += 10 
+
+                if time_run - time_since_collected <= 2000:
+                    screen.blit(chest_opened, (WIDTH/2-10, 200))
+                    draw_text("Candy cane reward moved to inventory", text_font_small, (0, 0, 0), 150, 150)
+
+                if snowman_chest_opened == False:
+                    screen.blit(chest_closed, (WIDTH/2-10, 200))
 
         #drawing the player's attacks (don't do damage but is visible there); function for dmg calc is only where rooms have enemies
         if event.type == pygame.MOUSEBUTTONDOWN and player_equipped == "sword":
@@ -1763,6 +1788,17 @@ while running:
     if settings == True:
         pygame.draw.rect(screen, (0,0,0), (50,50,540,380))
         draw_text("SETTINGS", text_font, (255,255,255), 260, 60)
+        draw_text("Choose your character:", text_font, (255, 255, 255), 150, 125)
+        start_player_choice = pygame.Rect(225, 170, 50, 50)
+        other_player_choice = pygame.Rect(375, 170, 50, 50)
+        if player == start_player: 
+            pygame.draw.rect(screen, (255, 225, 225), start_player_choice)
+        elif player == other_player: 
+            pygame.draw.rect(screen, (255, 225, 225), other_player_choice)
+        pygame.draw.rect(screen, (255, 255, 255), start_player_choice, 2)
+        pygame.draw.rect(screen, (255, 255, 255), other_player_choice, 2)
+        screen.blit(start_player, (235, 175))
+        screen.blit(other_player, (385, 183))
     
     # Store 
     if state == 4: 
