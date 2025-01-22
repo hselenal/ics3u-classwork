@@ -50,7 +50,7 @@ override_rect_2 = pygame.Rect(50, 200, WIDTH-100, 100)
 
 x_pic = pygame.image.load(os.getcwd() + "\sprites\X_pic.png")
 
-#Volume variables
+#Volute variables
 slider_x = 220
 slider_y = 350
 slider_width = 200
@@ -58,13 +58,15 @@ slider_height = 5
 knob_radius = 10
 min_volume = 0.0
 max_volume = 1.0
+
 current_volume = 0.5
 knob_x = slider_x + int(current_volume * slider_width)
+
 sound = pygame.mixer.Sound(os.getcwd() + "\sprites\music.wav")
 sound.set_volume(current_volume)
+
 font = pygame.font.Font(None, 36)
-sound_time = 0
-sound_check = 0
+volume_text = font.render(f"Volume: {current_volume:.2f}", True, (255, 255, 255))
 
 #Dialogue
 dialogue_box = pygame.image.load(os.getcwd() + "\sprites\dialogue_box.png")
@@ -102,7 +104,7 @@ player_AOE = pygame.Rect(player_x, player_y, 30, 20)
 
 font = pygame.font.Font(None, 30)
 hp_text = font.render(f"Health: {player_hp}", True, (0, 0, 0)) #player hp on screen
-health_potion_num = 0
+potion_count = 0
 
 w = True
 a = False
@@ -193,7 +195,11 @@ sled_rewards_collected = False
 santa = pygame.image.load(os.getcwd() + "\sprites\santa.png")
 santa_time = 0
 santa_hp = 500000
+###########################################################
+santa_move_timer = 0 
+###########################################################
 
+# End Variables
 end_dialogue_done = False
 end_dialogue_time = 0
 end_dialogue_num = 0
@@ -261,15 +267,6 @@ arrows_right = []
 
 bow_damage = 1000
 sword_damage = 10000
-
-#bonus powerups
-dmg_bonus = 1.15 #percentage
-dmg_buff_pic = pygame.image.load(os.getcwd() + "\sprites\dmg_buff.png")
-dmg_buff_pic = pygame.transform.scale(dmg_buff_pic, (40, 40))
-collected_4 = False #whether collected powerup in room yet
-collected_4_time = 0
-collected_11 = False
-collected_11_time = 0
 # -------------------------------------------------------------------------------------------------------------------------
 
 
@@ -294,6 +291,11 @@ def snowball_direction(player_x, player_y, snowman_x, snowman_y):
     player_pos = pygame.math.Vector2(player_x, player_y)
     snowman_pos = pygame.math.Vector2(snowman_x, snowman_y)
     direction = player_pos - snowman_pos 
+    ###########################################################
+    if direction[0] == 0 or direction[1] == 0: 
+        direction[0] = random.randrange(1, 5)
+        direction[1] = random.randrange(1, 5)
+    ###########################################################
     direction = direction.normalize() 
     return direction
 
@@ -338,7 +340,7 @@ class elves(): # contains all functions for the elves (initialization, movement,
         self.elf_hp = 5000 #max elf health
     
     def vector_calculations(self, elf_number): #calculates where the elf needs to move to
-        global player_hitbox, room, tree_hp, all_elves_hp, santa_hp
+        global player_hitbox, room, tree_hp, all_elves_hp
 
         if all_elves_hp[elf_number] > 0:
             self.normalized_new = [abs(self.normalized[0]), abs(self.normalized[1])] #always positive x and y values for the vector
@@ -359,8 +361,6 @@ class elves(): # contains all functions for the elves (initialization, movement,
             self.elf_y = -100
             if room == 3:
                 tree_hp -= 4000
-            if room == 12:
-                santa_hp -= 0
             if room == 2 or room == 3 or room == 12: #single elf room, christmas tree room, and santa room
                 all_elves_hp[elf_number] = -10000000000
 
@@ -468,19 +468,19 @@ class Santa:
     global santa_hp
     def __init__(self, x, y):
         self.summoned_elves = []
-        self.santa_x = x
-        self.santa_y = y
+        self.x = x
+        self.y = y
         self.killed = 0 #amount of elves the player has killed that have been summoned by santa
     def summon(self):
         global all_elves_hp, player_hp, santa_time, time_run
         if time_run - santa_time > 3000:
             if len(self.summoned_elves) < 5:
-                self.elf = elves(random.randint(int(self.santa_x) - 150, int(self.santa_x) + 150), (random.randint(self.santa_y - 20, self.santa_y + 20)))
+                self.elf = elves(random.randint(int(self.x) - 150, int(self.x) + 150), (random.randint(self.y - 20, self.y + 20)))
                 self.summoned_elves.append((self.elf))
             santa_time = time_run
         if len(self.summoned_elves) == 5:
             for creature in range(len(self.summoned_elves)):
-                killed = self.summoned_elves[creature].vector_calculations(len(all_elves_hp)-1-(5-creature)) #gets num of elves the player has killed
+                killed = self.summoned_elves[creature].vector_calculations(creature+1) #gets num of elves the player has killed
                 self.summoned_elves[creature].draw_elf()
                 player_hp = self.summoned_elves[creature].attack(player_hp)
                 if killed == True:
@@ -492,19 +492,17 @@ class Santa:
             all_elves_hp = [5000 for i in range(11)]
                 
         return self.summoned_elves
-    
-    def santa_rectangle(self):
-        return [self.santa_x, self.santa_y]
-
+    # all_elves_hp[0] -= bow_damage
+    # draw_text("1000", text_font_small, (0, 0, 0), elf.elf_rect(0), elf.elf_rect(1))
     def snowball(self):
         global snowman_timer, snowballs, direction, player_hitbox, player_hp, damage_taken, player_damage, time_run
         
         # Santa shooting 
         if snowman_timer + 1200 < time_run: 
-            snowballs.append([self.santa_x + 20, self.santa_y + 20])
+            snowballs.append([self.x + 20, self.y + 20])
             snowman_timer = time_run 
         for i in range(len(snowballs)): 
-            direction = snowball_direction(player_x, player_y, self.santa_x, self.santa_y)
+            direction = snowball_direction(player_x, player_y, self.x, self.y)
             snowballs[i][0] += direction[0] * 20
             snowballs[i][1] += direction[1] * 20
                 
@@ -514,9 +512,16 @@ class Santa:
                 damage_taken = snowman_hit("snowball")
                 player_hp -= damage_taken
                 player_damage.append([time_run, damage_taken, random.randrange(0, 20), random.randrange(0, 20)])
-    
+    ###########################################################
+    def follow(self): 
+        global santa_move_timer, time_run, player_x, player_y
+        if santa_move_timer + 1000 < time_run: 
+            direction = snowball_direction(player_x, player_y, self.x, self.y)
+        self.x += round(direction[0], 0)
+        self.y += round(direction[1], 0)
+        ###########################################################
     def draw(self):
-        santa_rect = pygame.Rect(self.santa_x-15, self.santa_y-15, 30, 30)
+        santa_rect = pygame.Rect(self.x-15, self.y-15, 30, 30)
         screen.blit(santa, santa_rect)
             
 
@@ -555,7 +560,7 @@ def player_attacking(enemy_type, enemy, elf_number, hp, enemy_hitbox, w, a, s, d
         else:
             return [False, 0, 0]
 
-    elif enemy_type == "snowman" or enemy_type == "rudolph" or enemy_type == "santa":
+    elif enemy_type == "snowman":
         if event.type == pygame.MOUSEBUTTONDOWN and time_run - hit_time > 150:
             if player_AOE.colliderect(enemy_hitbox) == True:
                 dmg_done = sword_damage
@@ -568,6 +573,21 @@ def player_attacking(enemy_type, enemy, elf_number, hp, enemy_hitbox, w, a, s, d
                 return [False, 0, 0]
         else:
             return [False, 0, 0]
+    
+    elif enemy_type == "rudolph":
+        if event.type == pygame.MOUSEBUTTONDOWN and time_run - hit_time > 150:
+            if player_AOE.colliderect(rudolph_hitbox) == True:
+                dmg_done = sword_damage
+                hp -= dmg_done
+                hit_time = time_run
+                return [True, dmg_done, player_crit_chance]
+            else:
+                return [False, 0, 0]
+        else:
+            return [False, 0, 0]
+
+    elif enemy_type == "santa":
+        pass
     
     else:
         return [False, 0, 0]
@@ -585,30 +605,37 @@ def player_attacking_bow(elf, arrow, elf_number): #currently only works for atta
 
         if arrow_hitbox.colliderect(elf_hitbox):
             all_elves_hp[elf_number] -= bow_damage
-            draw_text(f"{bow_damage}", text_font_small, (0, 0, 0), elf_x, elf_y)         
+            draw_text(f"{bow_damage}", text_font_small, (0, 0, 0), elf_x, elf_y)
 
 
 def player_draw_dmg(enemy_type, enemy, elf_number, enemy_x, enemy_y, hp): #only works for sword
     if enemy_type == "elf":
         hit = player_attacking("elf", enemy, elf_number, hp, 0, w, a, s, d)
+
         if hit[0] == True:
             if hit[2] == 1:
                 all_hits.append([hit[1], time_run, 1, random.randint(-10, 10), random.randint(-10, 10), enemy])
                 hp[elf_number] -= hit[1]
+
             else:
                 all_hits.append([hit[1], time_run, 0, random.randint(-10, 10), random.randint(-10, 10), enemy])
                 hp[elf_number] -= hit[1]
+
     
-    elif enemy_type == "snowman":
+    if enemy_type == "snowman":
         hit = player_attacking("snowman", enemy, 0, hp, pygame.Rect(enemy_x-25, enemy_y-25, 50, 50), w, a, s, d)
+
+        if hit[0] == True:
+            if hit[2] == 1:
+                all_hits.append([hit[1], time_run, 1, random.randint(-10, 10), random.randint(-10, 10), enemy])
+                hp -= hit[1]
+
+            else:
+                all_hits.append([hit[1], time_run, 0, random.randint(-10, 10), random.randint(-10, 10), enemy])
+                hp -= hit[1]
     
-    elif enemy_type == "rudolph":
+    if enemy_type == "rudolph":
         hit = player_attacking("rudolph", enemy, 0, hp, pygame.Rect(enemy_x-25, enemy_y-25, 50, 50), w, a, s, d)
-    
-    elif enemy_type == "santa":
-        hit = player_attacking("santa", enemy, 0, hp, pygame.Rect(enemy_x-25, enemy_y-25, 50, 50), w, a, s, d)
-        
-    if enemy_type == "snowman" or enemy_type == "rudolph" or enemy_type == "santa": 
         if hit[0] == True:
             if hit[2] == 1:
                 all_hits.append([hit[1], time_run, 1, random.randint(-10, 10), random.randint(-10, 10), enemy])
@@ -627,7 +654,7 @@ def player_draw_dmg(enemy_type, enemy, elf_number, enemy_x, enemy_y, hp): #only 
 
     return hp
 
-def saving_new_file(file, room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, player_hp, inventory, health_potion_num):
+def saving_new_file(file, room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, player_hp, inventory):
     global num_saves
     lines = {
         "room" : room,
@@ -638,8 +665,7 @@ def saving_new_file(file, room, enemy_max_hp, enemy_dead, player_x, player_y, ca
         "candies" : candies,
         "chest_opened" : chest,
         "player_hp" : player_hp,
-        "inventory" : inventory,
-        "health_potions" : health_potion_num
+        "inventory" : inventory
     }
 
     with open(file, "w") as f:
@@ -660,15 +686,15 @@ def load_old_save(file):
         chest_opened = lines["chest_opened"]
         player_hp = lines["player_hp"]
         inventory = lines["inventory"]
-        health_potion = lines["health_potions"]
 
-    return [room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest_opened, player_hp, inventory, health_potion]
+    return [room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest_opened, player_hp, inventory]
 
 def draw_slider(screen, x, y, width, height, knob_x):
     # Draw the track
     pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height))
     # Draw the knob
     pygame.draw.circle(screen, (50, 150, 255), (knob_x, y + height // 2), knob_radius)
+
 def get_volume_from_position(knob_x, slider_x, slider_width, min_volume, max_volume):
     relative_position = (knob_x - slider_x) / slider_width
     return min_volume + (max_volume - min_volume) * relative_position
@@ -676,23 +702,7 @@ def get_volume_from_position(knob_x, slider_x, slider_width, min_volume, max_vol
 # Christmas tree and elf initiation --- the single elf in room 2, not the ones summoned by the tree
 tree = Christmas_Tree(WIDTH/2- 20, 100)
 satan = Santa(320, 100)
-elf = elves(WIDTH/2, 100)
-
-def player_attack_bow(satan, arrow): #currently only works for attacking the elves
-    global santa_hp
-
-    for pos in arrow:
-        arrow_hitbox = pygame.Rect(pos[0], pos[1], 5, 10)
-        santa_x = satan.santa_rectangle()[0]
-        santa_y = satan.santa_rectangle()[1]
-        santa_hitbox = pygame.Rect(santa_x, santa_y, 40, 40)
-        arrow_hitbox = pygame.Rect(pos[0], pos[1], 5, 10) 
-
-        if arrow_hitbox.colliderect(santa_hitbox):
-            santa_hp -= bow_damage
-            draw_text(f"{bow_damage}", text_font_small, (0, 0, 0), santa_x, santa_y)
-    
-    return santa_hp
+elf = elves(50, 50)
 
 
 running = True
@@ -704,7 +714,6 @@ while running:
     time_run = pygame.time.get_ticks()
     mouse_x, mouse_y = pygame.mouse.get_pos() # get the mouse position for the clicking of play button
     left_M_pressed, middle_M_pressed, right_M_pressed = pygame.mouse.get_pressed() # get state of mouse (pressed or not)
-    volume_text = font.render(f"Volume: {current_volume:.2f}", True, (255, 255, 255))
 
     # EVENT HANDLING 
     for event in pygame.event.get():
@@ -719,18 +728,17 @@ while running:
                 settings = False
             elif event.key == pygame.K_ESCAPE and state == 1:
                 state = 3
-        
+
         #Settings events
         if settings == True and state == 3:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                # Change character settings
                 if start_player_choice.collidepoint(mouse_x, mouse_y): 
                     player = start_player 
                     player_rotated = player 
                 if other_player_choice.collidepoint(mouse_x, mouse_y): 
                     player = other_player
                     player_rotated = player
-                # Volume Slider Effects
+                # Volume Slider events 
                 if event.button == 1:
                 # Check if the user clicked on the knob
                     mouse_x, mouse_y = event.pos
@@ -746,10 +754,6 @@ while running:
                     knob_x = max(slider_x, min(mouse_x, slider_x + slider_width))
                     current_volume = get_volume_from_position(knob_x, slider_x, slider_width, min_volume, max_volume)
                     sound.set_volume(current_volume)
-
-        if state == 1 and sound_time == 0:
-            sound.play(-1)
-            sound_time += 1
     
         # Store events 
         if event.type == pygame.KEYDOWN:
@@ -771,7 +775,6 @@ while running:
                 elif item_number == 1 and candies >= prices[item_number]:
                     bow_damage += 500
                     upgrades = False
-                    candies -= prices[item_number]
                     item_bought = 1
                 else:
                     upgrades = False
@@ -843,7 +846,7 @@ while running:
                         sled_moving[1] = True 
                     if player_hitbox.colliderect(pygame.Rect(sled_xy[2][0], sled_xy[2][1], 124, 15)) and sled_xy[2] != sled_done[2]: 
                         sled_moving[2] = True 
-                
+
             if room == 13 and end_dialogue_done == False:
                 if event.type == pygame.MOUSEBUTTONDOWN and time_run - end_dialogue_time >= 150: 
                     end_dialogue_num += 1 
@@ -852,8 +855,9 @@ while running:
             if end == True:
                 player_equipped = ""
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    state = 0
+                    room = 0
                     end = False
-                    pygame.quit()
 
 
         # handling keys for movement (can run multiple at a time)
@@ -973,17 +977,6 @@ while running:
         if room == 2:
             elf.vector_calculations(0)
             player_hp = elf.attack(player_hp)
-        
-        if room == 4:
-            if collected_4 == False:
-                dmg_buff_rect = pygame.Rect(105, 310, 40, 40)
-
-            if player_hitbox.colliderect(dmg_buff_rect):
-                dmg_buff_rect = pygame.Rect(50, 50, 10, 10)
-                collected_4 = True
-                sword_damage *= dmg_bonus
-                bow_damage *= dmg_bonus
-                collected_4_time = time_run
 
         
         if room == 6: 
@@ -992,7 +985,6 @@ while running:
                 snowman_x += snowman_speed 
                 if snowman_x < 150 or snowman_x > 500: 
                     snowman_speed *= -1 
-
                 if snowman_dialogue_done == True: 
                     snowman_hitbox = pygame.Rect(snowman_x - 25, snowman_y - 25, 50, 50)
 
@@ -1019,9 +1011,9 @@ while running:
                         damage_taken = snowman_hit("snowball")
                         player_hp -= damage_taken
                         player_damage.append([time_run, damage_taken, random.randrange(0, 20), random.randrange(0, 20)])
-                    
-                    else: 
-                        snowman_hitbox = pygame.Rect(-1000, -1000, 50, 50)
+
+            else: 
+                snowman_hitbox = pygame.Rect(-1000, -1000, 50, 50)
 
 
         if room == 8:
@@ -1144,8 +1136,6 @@ while running:
                     sled_xy[2][1] = sled_done[2][1]
                     sled_moving[2] = False 
                     sled_pass[2] = True
-
-
         
         if room == 13:
             if end_dialogue_done == False:
@@ -1175,7 +1165,10 @@ while running:
     (room != 2 or (room == 2 and all_elves_hp[0] <= 0)) and # Elf room 
     (room != 9 or (room == 9 and rudolph_hp <= 0)) and # Rudolph room 
     (room != 6 or (room == 6 and snowman_hp <= 0)) and # Snowman room 
-    (room != 11 or (room == 11 and sled_pass == [True, True, True]))): # Sled room 
+    (room != 11 or (room == 11 and sled_pass == [True, True, True])) and # Sled room 
+###########################################################
+    (room != 12 or (room == 12 and santa_hp <= 0))): # Santa room
+###########################################################
         room += 1 
         player_x = WIDTH/2
         player_y = 340
@@ -1187,10 +1180,6 @@ while running:
             rect = pygame.Rect(x, y + 10, 30, 20)
             cane_rects[i] = rect
         pygame.time.wait(250)
-
-        if room == 12:
-            for i in range(5): #creates new elves for Santa
-                all_elves_hp.append(5000)
     
     # Buying store items 
     if state == 4:
@@ -1215,7 +1204,6 @@ while running:
         screen.blit(start_screen, pygame.Rect(0, 0, WIDTH, HEIGHT))
         screen.blit(start_playing, (0, 0, WIDTH, HEIGHT))
         pygame.draw.rect(screen, (0, 0, 0), (217, 300, 208, 100))
-        draw_text("LOAD", text_font, (255, 255, 255), 280, 340)
     
         if start_playing_rect.collidepoint(mouse_x, mouse_y) and left_M_pressed == True:
             state = 0.5 #tutorial state
@@ -1228,14 +1216,13 @@ while running:
         if num_saves >= 1:
             if save_1_rect.collidepoint(mouse_x, mouse_y) == True and left_M_pressed == True:
                 all_info = load_old_save("save_1.json") 
-                #returns [room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest_opened, player_hp, inventory, health_potions]
+                #returns [room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest_opened, player_hp, inventory]
                 room = all_info[0]
                 player_x = all_info[3]
                 player_y = all_info[4]
                 candies = all_info[5]
                 player_hp = all_info[7]
                 inventory = all_info[8]
-                health_potion_num = all_info[9]
                 state = 1
 
                 if room == 2:
@@ -1296,8 +1283,6 @@ while running:
                 player_y = all_info[4]
                 candies = all_info[5]
                 player_hp = all_info[7]
-                inventory = all_info[8]
-                health_potion_num = all_info[9]
                 state = 1
 
                 if room == 2:
@@ -1347,7 +1332,7 @@ while running:
                         rudolph_chest_opened = False
                     else:
                         rudolph_chest_opened = True
-
+                
     
     # resets to start playing screen but keeps the game running in the background still (for if player wants to load in prev run)
     if state == 3 and settings == False:
@@ -1455,7 +1440,7 @@ while running:
 
                 if (num_saves == 0 or 
                     (num_saves == 2 and override_rect_1.collidepoint(mouse_x, mouse_y) == True)):
-                    saving_new_file("save_1.json", room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, player_hp, inventory, health_potion_num)
+                    saving_new_file("save_1.json", room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, inventory)
                     if num_saves == 0:
                         num_saves += 1
                         with open("all_save_files.txt", "w") as f: #save number of save files to txt
@@ -1463,7 +1448,7 @@ while running:
                             f.close()
                 elif (num_saves == 1 or 
                     (num_saves == 2 and override_rect_2.collidepoint(mouse_x, mouse_y) == True)):
-                    saving_new_file("save_2.json", room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, player_hp, inventory, health_potion_num)
+                    saving_new_file("save_2.json", room, enemy_max_hp, enemy_dead, player_x, player_y, candies, chest, inventory)
                     if num_saves == 1:
                         num_saves += 1
                         with open("all_save_files.txt", "w") as f: #save number of save files to txt
@@ -1517,8 +1502,7 @@ while running:
             pygame.draw.rect(screen, (255, 0, 0), (453, 33, 608-453, 78-33), 3)
             pygame.draw.line(screen, (255, 0, 0), (569, 78), (569, 128), 3)
             draw_text("inventory (press 1, 2 or", text_font_smaller, (0, 0, 0), 420, 134)
-            draw_text("3 to equip;", text_font_smaller, (0, 0, 0), 470, 148)
-            draw_text("click to use)", text_font_smaller, (0, 0, 0), 465, 163)
+            draw_text("3 to use / equip)", text_font_smaller, (0, 0, 0), 470, 148)
 
             pygame.draw.rect(screen, (255, 0, 0), (372, 215, 464-416, 184-148), 3)
             pygame.draw.line(screen, (255, 0, 0), (417, 226), (430, 240), 3)
@@ -1597,18 +1581,13 @@ while running:
                 
                 if room == 6: 
                     if arrow_hitbox.colliderect(snowman_hitbox): 
-                        snowman_hp -= bow_damage
-                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20), bow_damage])
+                        snowman_hp -= 1000
+                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20)])
                 
                 if room == 9:
                     if arrow_hitbox.colliderect(rudolph_hitbox) and rudolph_dialogue_done == True:
-                        rudolph_hp -= bow_damage
-                        draw_text(f"{bow_damage}", text_font_small, (0, 0, 0), rudolph_x, rudolph_y)
-
-                if room == 12:
-                    if arrow_hitbox.colliderect(santa_hitbox):
-                        santa_hp -= bow_damage
-                        draw_text(f"{bow_damage}", text_font_small, (0, 0, 0), santa)
+                        rudolph_hp -= 1000
+                        draw_text("1000", text_font_small, (0, 0, 0), rudolph_x, rudolph_y)
                     
             for pos in arrows_left:
                 pos[0] -= 30
@@ -1623,13 +1602,13 @@ while running:
                 if room == 6: 
                     if arrow_hitbox.colliderect(snowman_hitbox): 
                         snowman_hp -= bow_damage
-                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20), bow_damage])
+                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20)])
                     
                 
                 if room == 9:
                     if arrow_hitbox.colliderect(rudolph_hitbox) and rudolph_dialogue_done == True:
                         rudolph_hp -= bow_damage
-                        draw_text(str(bow_damage), text_font_small, (0, 0, 0), rudolph_x, rudolph_y)
+                        draw_text("1000", text_font_small, (0, 0, 0), rudolph_x, rudolph_y)
                     
             for pos in arrows_down:
                 pos[1] += 30
@@ -1644,7 +1623,7 @@ while running:
                 if room == 6: 
                     if arrow_hitbox.colliderect(snowman_hitbox): 
                         snowman_hp -= bow_damage
-                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20), bow_damage])
+                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20)])
                 
                 if room == 9:
                     if arrow_hitbox.colliderect(rudolph_hitbox) and rudolph_dialogue_done == True:
@@ -1664,7 +1643,7 @@ while running:
                 if room == 6: 
                     if arrow_hitbox.colliderect(snowman_hitbox): 
                         snowman_hp -= bow_damage
-                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20), bow_damage])
+                        snowman_damage.append([time_run, random.randrange(-50, 0), random.randrange(-30, 20)])
                 
                 if room == 9:
                     if arrow_hitbox.colliderect(rudolph_hitbox) and rudolph_dialogue_done == True:
@@ -1681,6 +1660,33 @@ while running:
 
             if player_equipped == "sword":
                 player_draw_dmg("elf", elf, 0, elf.elf_rect(0), elf.elf_rect(1), all_elves_hp)
+        
+        # room with santa
+        if room == 12:
+            if santa_hp > 0:
+                all_creatures = satan.summon()
+                satan.draw()
+                satan.snowball()
+                ###########################################################
+                satan.follow()
+                ###########################################################
+                for i in range(len(all_creatures)):
+                    if player_equipped == "sword":
+                        player_draw_dmg("elf", all_creatures[i], i+1, all_creatures[i].elf_rect(0), all_creatures[i].elf_rect(1), all_elves_hp)
+                        
+                    if player_equipped == "bow":
+                        player_attacking_bow(all_creatures[i], arrows_up, i+1)
+                        player_attacking_bow(all_creatures[i], arrows_right, i+1)
+                        player_attacking_bow(all_creatures[i], arrows_down, i+1)
+                        player_attacking_bow(all_creatures[i], arrows_left, i+1)
+            
+            for snowball in snowballs: 
+                pygame.draw.circle(screen, (225, 225, 225), (snowball[0], snowball[1]), 15)
+            for damage in player_damage: 
+                if time_run - damage[0] < 500: 
+                    draw_text(str(damage[1]), text_font_small, (255, 0, 0), player_x + damage[2], player_y + damage[3])
+
+
         
         # Room with Christmas Tree
         if room == 3:
@@ -1718,11 +1724,10 @@ while running:
                     christmas_chest_opened = True
                     tree_rewards_collected = True
                     candies += 10
-                    health_potion_num += 1
                     
                 if time_run - time_since_collected <= 2000:
                     screen.blit(chest_opened, (WIDTH/2-10, 200))
-                    draw_text("Rewards moved to inventory", text_font_small, (0, 0, 0), 160, 150)
+                    draw_text("Candy cane reward moved to inventory", text_font_small, (0, 0, 0), 150, 150)
 
                 if christmas_chest_opened == False:
                     screen.blit(chest_closed, (WIDTH/2-10, 200))
@@ -1735,12 +1740,6 @@ while running:
                      (305, 215, 30, 70), (380, 150, 30, 90), (155, 215, 30, 150)]
             for wall in walls:
                 pygame.draw.rect(screen, (100, 200, 255), wall)
-
-            if collected_4 == False:
-                screen.blit(dmg_buff_pic, (105, 310))
-            
-            if time_run - collected_4_time <= 1000:
-                draw_text("Damage +15%", text_font, (0, 0, 0), 100, 290)
         else: 
             for i in range(len(walls)): 
                 walls[i] = (-1000, -1000, 100, 100)
@@ -1756,7 +1755,7 @@ while running:
                     
                     for damage in snowman_damage: 
                         if time_run - damage[0] < 500: 
-                            draw_text(str(damage[3]), text_font_small, (0, 0, 0), snowman_x + damage[1], snowman_y + damage[2])
+                            draw_text("1000", text_font_small, (0, 0, 0), snowman_x + damage[1], snowman_y + damage[2])
                     for damage in player_damage: 
                         if time_run - damage[0] < 500: 
                             draw_text(str(damage[1]), text_font_small, (255, 0, 0), player_x + damage[2], player_y + damage[3])
@@ -1779,7 +1778,7 @@ while running:
                     time_since_collected = time_run 
                     snowman_chest_opened = True 
                     snowman_rewards_collected = True 
-                    candies += 10
+                    candies += 10 
 
                 if time_run - time_since_collected <= 2000:
                     screen.blit(chest_opened, (WIDTH/2-10, 200))
@@ -1841,7 +1840,6 @@ while running:
                 if rudolph_chest_opened == False:
                     screen.blit(chest_closed, (WIDTH/2-10, 200))
 
-
         if room == 11: 
             screen.blit(sled_top, sled_xy[0])
             screen.blit(sled_middle, sled_xy[1])
@@ -1856,7 +1854,6 @@ while running:
                 draw_text("Please fix me!!!", text_font, (0, 0, 0), 50, 3*HEIGHT/4-20)
             else:
                 sled_dialogue_done = True
-
             if sled_pass == [True, True, True]: 
                 chest_rect = pygame.Rect(WIDTH/2-20, 190, 60, 50)
                 
@@ -1865,26 +1862,14 @@ while running:
                     snowman_chest_opened = True 
                     snowman_rewards_collected = True 
                     candies += 10 
+
                 if time_run - time_since_collected <= 2000:
                     screen.blit(chest_opened, (WIDTH/2-10, 200))
                     draw_text("Candy cane reward moved to inventory", text_font_small, (0, 0, 0), 150, 150)
+
                 if snowman_chest_opened == False:
                     screen.blit(chest_closed, (WIDTH/2-10, 200))
-            
-                if collected_11 == False:
-                    dmg_buff_rect = pygame.Rect(200, 200, 40, 40)
-                    screen.blit(dmg_buff_pic, (200, 200))
 
-                if player_hitbox.colliderect(dmg_buff_rect) == True:
-                    collected_11 = True
-                    collected_11_time = time_run
-                    dmg_buff_rect = pygame.Rect(50, 50, 20, 20)
-                    sword_damage *= 1.30
-                    bow_damage *= 1.30
-                
-                if time_run - collected_11_time <= 2000 and collected_11 == True:
-                    draw_text("Damage +30%", text_font, (0, 0, 0), 170, 150)
-        
         if room == 13:
             screen.blit(grinch, (200, HEIGHT/2-40))
             pygame.draw.circle(screen, (255,0,0), (WIDTH/2 -9, HEIGHT/2 -30), 10)
@@ -1913,40 +1898,6 @@ while running:
             pygame.draw.rect(screen, (0,0,0), (0,0,640,480))
             draw_text("Congratulations!", text_font, (255, 255, 255), WIDTH/2 -120, HEIGHT/2)
             draw_text("You Ruined Christmas!", text_font, (255, 255, 255), WIDTH/2 -160, HEIGHT/2 - 30)
-        
-        # room with santa
-        if room == 12:
-            if santa_hp > 0:
-                pygame.draw.rect(screen, (255, 255, 255), (0,418,640,34))
-                pygame.draw.rect(screen, (255, 0, 0), (0, 420, santa_hp/781.25, 30))
-                all_creatures = satan.summon()
-                satan.draw()
-                satan.snowball()
-                for i in range(len(all_creatures)):
-                    if player_equipped == "sword":
-                        player_draw_dmg("elf", all_creatures[i], len(all_elves_hp)-1-(5-i), all_creatures[i].elf_rect(0), all_creatures[i].elf_rect(1), all_elves_hp)
-                        
-                    if player_equipped == "bow":
-                        player_attacking_bow(all_creatures[i], arrows_up, len(all_elves_hp)-1-(5-i))
-                        player_attacking_bow(all_creatures[i], arrows_right, len(all_elves_hp)-1-(5-i))
-                        player_attacking_bow(all_creatures[i], arrows_left, len(all_elves_hp)-1-(5-i))
-                        player_attacking_bow(all_creatures[i], arrows_down, len(all_elves_hp)-1-(5-i))
-
-                        player_attack_bow(satan, arrows_up)
-                        player_attack_bow(satan, arrows_right)
-                        player_attack_bow(satan, arrows_down)
-                        player_attack_bow(satan, arrows_left)
-            
-            for snowball in snowballs: 
-                pygame.draw.circle(screen, (225, 225, 225), (snowball[0], snowball[1]), 15)
-            for damage in player_damage: 
-                if time_run - damage[0] < 500: 
-                    draw_text(str(damage[1]), text_font_small, (255, 0, 0), player_x + damage[2], player_y + damage[3])
-
-        # room after beating the game
-        if room == 13:
-            pass
-
 
         #drawing the player's attacks (don't do damage but is visible there); function for dmg calc is only where rooms have enemies
         if event.type == pygame.MOUSEBUTTONDOWN and player_equipped == "sword":
@@ -1974,16 +1925,13 @@ while running:
         pygame.draw.rect(screen, (0,0,0), (480,10,40,40), width=3)
         pygame.draw.rect(screen, (0,0,0), (530,10,40,40), width=3)     
         pygame.draw.rect(screen, (0,0,0), (580,10,40,40), width=3)
-        draw_text("1", text_font, (0, 0, 0), 495, 50)
-        draw_text("2", text_font, (0, 0, 0), 545, 50)
-        draw_text("3", text_font, (0, 0, 0), 595, 50)
         
         for i in range(len(inventory)):
             if inventory[i] == "SWORD":
                 screen.blit(sword_1, (485,15))
             elif inventory[i] == "BOW":
                 screen.blit(bow, (540, 13))
-            elif health_potion_num > 0:
+            elif inventory[i] == "HEALTH" and health_potion_num > 0:
                 screen.blit(health_potion, (587, 15))
                 while health_potion_num >= 1 and health_potion_num <= 9 and time_run - checking >= 1:
                     screen.blit(potion_text, (605, 26))
@@ -2055,11 +2003,10 @@ while running:
     if settings == True:
         pygame.draw.rect(screen, (0,0,0), (50,50,540,380))
         draw_text("SETTINGS", text_font, (255,255,255), 260, 60)
-
-        #Volume Slider Appearance
+        # Volume slider appearance 
         draw_slider(screen, slider_x, slider_y, slider_width, slider_height, knob_x)
         screen.blit(volume_text, (slider_x, slider_y - 50))
-
+        # Choosing character appearance 
         draw_text("Choose your character:", text_font, (255, 255, 255), 150, 125)
         start_player_choice = pygame.Rect(225, 170, 50, 50)
         other_player_choice = pygame.Rect(375, 170, 50, 50)
